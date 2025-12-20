@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const TournamentApp());
 }
 
@@ -13,34 +18,116 @@ class TournamentApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Tournament App',
       theme: ThemeData(primarySwatch: Colors.deepPurple),
-      home: const HomeScreen(),
+      home: const AuthGate(),
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+// Simple Phone Authentication screen
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
 
-  final List<Map<String, String>> tournaments = const [
-    {'game': 'Free Fire', 'prize': '₹5,000', 'slots': '48/100'},
-    {'game': 'BGMI', 'prize': '₹10,000', 'slots': '72/100'},
-    {'game': 'COD', 'prize': '₹8,000', 'slots': '36/100'},
-    {'game': 'Valorant', 'prize': '₹12,000', 'slots': '64/100'},
-  ];
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  String _verificationId = '';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tournaments')),
-      body: ListView.builder(
+      appBar: AppBar(title: const Text('Phone Login')),
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        itemCount: tournaments.length,
-        itemBuilder: (context, index) {
-          final tournament = tournaments[index];
-          return TournamentCard(
-            game: tournament['game']!,
-            prize: tournament['prize']!,
-            slots: tournament['slots']!,
+        child: _auth.currentUser == null ? Column(
+          children: [
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                  labelText: 'Phone number', hintText: '+91xxxxxxxxxx'),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () async {
+                await _auth.verifyPhoneNumber(
+                  phoneNumber: _phoneController.text,
+                  verificationCompleted: (credential) async {
+                    await _auth.signInWithCredential(credential);
+                    setState(() {});
+                  },
+                  verificationFailed: (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.message ?? 'Error')),
+                    );
+                  },
+                  codeSent: (id, token) {
+                    _verificationId = id;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('OTP sent')),
+                    );
+                  },
+                  codeAutoRetrievalTimeout: (id) {},
+                );
+              },
+              child: const Text('Send OTP'),
+            ),
+            TextField(
+              controller: _otpController,
+              decoration: const InputDecoration(labelText: 'Enter OTP'),
+              keyboardType: TextInputType.number,
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final credential = PhoneAuthProvider.credential(
+                    verificationId: _verificationId,
+                    smsCode: _otpController.text);
+                await _auth.signInWithCredential(credential);
+                setState(() {});
+              },
+              child: const Text('Verify OTP'),
+            ),
+          ],
+        ) : const HomeScreen(),
+      ),
+    );
+  }
+}
+
+// HomeScreen now fetches tournaments from Firestore
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tournaments')),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _db.collection('tournaments').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final tournaments = snapshot.data!.docs;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: tournaments.length,
+            itemBuilder: (context, index) {
+              final data = tournaments[index].data() as Map<String, dynamic>;
+              return TournamentCard(
+                game: data['game'],
+                prize: data['prize'],
+                slots: data['slots'],
+              );
+            },
           );
         },
       ),
