@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "450879153246",
+    "project_id": "ff-crown-d11ac",
+    "storage_bucket": "ff-crown-d11ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:450879153246:android:6ef8ef98a8b29b58abc0cf",
+        "android_client_info": {
+          "package_name": "Com.ff.crown"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAbkMQrgPtRfZh85eGugvodcODXo0N2PdY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
